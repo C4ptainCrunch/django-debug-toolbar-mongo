@@ -1,15 +1,8 @@
-from django.urls import path, re_path, include
 import views
+from debug_toolbar.toolbar import debug_toolbar_urls
+from django.urls import path
 
 urlpatterns = [
-    path('', views.index),
+    path("", views.index),
+    *debug_toolbar_urls(),
 ]
-
-
-import debug_toolbar
-from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.conf.urls.static import static
-
-url_debug = [path('__debug__/', include(debug_toolbar.urls))]
-url_debug += staticfiles_urlpatterns()
-urlpatterns = url_debug + urlpatterns

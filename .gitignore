@@ -1,8 +1,4 @@
 *.pyc
-.tox
 *.egg-info
-.eggs
-.idea
 .venv
-
-example/views_hidden.py
+uv.lock

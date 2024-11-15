@@ -1,1 +1,1 @@
-from .panel import MongoPanel
+from .panel import MongoPanel as MongoPanel

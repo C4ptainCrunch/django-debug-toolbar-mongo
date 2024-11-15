@@ -1,64 +1,24 @@
-from django.template import Template, Context
-from django.template.loader import render_to_string
-from django.utils.safestring import mark_safe
-from django.conf import settings
-from django.utils.translation import gettext_lazy as _
-from django.urls import path
-from django.templatetags.static import static
-
 from debug_toolbar.panels import Panel
 
-from django.views.debug import get_default_exception_reporter_filter
-get_safe_settings = get_default_exception_reporter_filter().get_safe_settings
-
 from .tracker import QueryTracker
-from .views import mongo_explain
-
-_NAV_SUBTITLE_TPL = u'''
-{% for o, n, t in operations %}
-    {{ n }} {{ o }}{{ n|pluralize }} in {{ t }}ms<br/>
-
-    {% if forloop.last and forloop.counter0 %}
-        {{ count }} operation{{ count|pluralize }} in {{ time }}ms
-    {% endif %}
-{% endfor %}
-'''
 
 
 class MongoPanel(Panel):
-    """Panel that shows information about MongoDB operations.
-    """
-    name = 'MongoDB'
+    name = "MongoDB"
     has_content = True
-    template = 'mongo-panel.html'
-
-    # def __init__(self, *args, **kwargs):
-    #     super(MongoPanel, self).__init__(*args, **kwargs)
-    #     operation_tracker.install_tracker()
+    template = "mongodb-panel.html"
 
     def title(self):
-        return 'MongoDB Operations'
+        return "MongoDB Operations"
 
     def nav_title(self):
-        return 'MongoDB'
-
-    @classmethod
-    def get_urls(cls):
-        return [
-            path("mongo_explain/", mongo_explain, name="mongo_explain"),
-        ]
-
-    @property
-    def scripts(self):
-        scripts = super().scripts
-        scripts.append(static("debug_toolbar_mongo/debug_toolbar_mongo.js"))
-        return scripts
+        return "MongoDB"
 
     def nav_subtitle(self):
         stats = self.get_stats()
-        count = len(stats['queries'])
-        time_total = sum(list(map(lambda i: i['time'], stats['queries'])))
-        return f'{count} queries in {round(time_total)} ms'
+        count = len(stats["queries"])
+        time_total_ms = sum([query["duration_ms"] for query in stats["queries"]])
+        return f"{count} queries in {round(time_total_ms)} ms"
 
     def enable_instrumentation(self):
         QueryTracker.enable()
@@ -67,28 +27,33 @@ class MongoPanel(Panel):
         QueryTracker.disable()
 
     def process_request(self, request):
-        QueryTracker.reset()  # сбрасываем старые данные перед новым запросом
+        QueryTracker.reset()
         result = super().process_request(request)
-        QueryTracker._save_last_refresh_query() # сохраняем последний запрос find
+        QueryTracker._save_last_refresh_query()
         return result
 
     def generate_stats(self, request, response):
-        # print('!! generate_stats')
-        self.record_stats({
-            'queries': QueryTracker.queries,
-            'explain_enabled': getattr(settings, 'DEBUG_TOOLBAR_MONGO_EXPLAIN', False)
-        })
+        queries = QueryTracker.queries
+        if queries:
+            min_start = min([query["start_time"] for query in queries])
+            max_end = max(
+                [query["start_time"] + query["duration"] for query in queries]
+            )
+            total_duration = max_end - min_start
+            for query in queries:
+                query["start_offset"] = (
+                    (query["start_time"] - min_start) / total_duration * 100
+                )
+                query["width_ratio"] = query["duration"] / total_duration * 100
+                query["trace_color"] = "#ccc"
+                query["duration_ms"] = query["duration"] * 1000
+        self.record_stats({"queries": queries})
 
-    # def process_request(self, request):
-    #     operation_tracker.reset()
-
-    # def process_response(self, request, response):
-    #     self.record_stats({
-    #         'queries': operation_tracker.queries,
-    #         'inserts': operation_tracker.inserts,
-    #         'updates': operation_tracker.updates,
-    #         'removes': operation_tracker.removes
-    #     })
-    #
-    # def generate_stats(self, request, response):
-    #     self.record_stats({'a': 1})
+    def generate_server_timing(self, request, response):
+        stats = self.get_stats()
+        title = "MongoDB {} queries".format(len(stats.get("queries", [])))
+        value = stats.get(
+            "mongodb_time",
+            sum([query["duration_ms"] for query in stats.get("queries", [])]),
+        )
+        self.record_server_timing("mongodb_time", title, value)

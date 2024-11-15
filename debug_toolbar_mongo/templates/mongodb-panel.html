@@ -1,0 +1,100 @@
+{% load i18n l10n %}
+
+{% if queries %}
+    <table>
+        <thead>
+        <tr>
+            <th>Command</th>
+            <th>Collection</th>
+            <th>Query</th>
+            <th>Timeline</th>
+            <th class="timing">Duration (ms)</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for query in queries %}
+            <tr>
+                <td><code>{{ query.type }}</code></td>
+                <td><code>{{ query.collection }}</code></td>
+                <td>
+                    <table class="inner">
+                        <tr>
+                            <td colspan="2">
+                                <code title="{{ query.query }}">{{ query.query|truncatechars:70 }}</code>
+                            </td>
+                        </tr>
+                        {% if query.projection %}
+                            <tr>
+                                <td class="muted">Project</td>
+                                <td>{{ query.projection }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if query.ordering %}
+                            <tr>
+                                <td class="muted">Sort</td>
+                                <td>{{ query.ordering }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if query.skip %}
+                            <tr>
+                                <td class="muted">Skip</td>
+                                <td>{{ query.skip }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if query.limit %}
+                            <tr>
+                                <td class="muted">Limit</td>
+                                <td>{{ query.limit }}</td>
+                            </tr>
+                        {% endif %}
+                        {% if query.hint %}
+                            <tr>
+                                <td class="muted">Hint</td>
+                                <td>{{ query.hint }}</td>
+                            </tr>
+                        {% endif %}
+                    </table>
+                </td>
+                <td>
+                    <svg class="djDebugLineChart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 5"
+                        preserveAspectRatio="none" aria-label="100.0%">
+                        <rect
+                            x="{{ query.start_offset|unlocalize }}" y="0"
+                            height="5" width="{{ query.width_ratio|unlocalize }}"
+                            fill="{{ query.trace_color }}"
+                        ></rect>
+                    </svg>
+                </td>
+                <td class="timing">
+                    {{ query.duration_ms|floatformat:2 }}
+                </td>
+
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p>No MongoDB queries were recorded during this request.</p>
+{% endif %}
+
+<style>
+    #djDebug table.inner td.muted {
+        color: #aaa;
+        width: 40px;
+    }
+
+    #djDebug table .timing {
+        text-align: right !important;
+    }
+
+    #djDebug table.inner {
+        margin: 0;
+        border: none;
+        background-color: transparent;
+    }
+
+    #djDebug table.inner tr {
+        background-color: transparent !important;
+    }
+
+</style>

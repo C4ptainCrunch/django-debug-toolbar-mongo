@@ -1,91 +1,66 @@
 from django.conf import settings
+from django.db import connection
 from django.shortcuts import render
-from contextlib import contextmanager
-import time
-import pymongo
 from pymongo import MongoClient
 
-
-collection = MongoClient(settings.MONGO_CONN)[settings.MONGO_DB][settings.MONGO_COLLECTION]
-
-
-@contextmanager
-def section(name):
-    print('┌' + f' {name} '.center(80, '─'))
-    yield
-    print('└' + '─'*80)
-
-
-@contextmanager
-def timer():
-    t = time.time()
-    yield
-    print(f" time: {(time.time() - t) * 1000} ms")
-
-
-def get_list(iterable):
-    with timer():
-        print(f"items count: {len(list(iterable))}")
+collection = MongoClient(settings.MONGO_CONN)[settings.MONGO_DB][
+    settings.MONGO_COLLECTION
+]
 
 
 def index(request):
-    with section('find one'):
-        get_list(collection.find_one({'job.title': 'Developer'}, comment='find developers'))
+    collection.find_one({"job.title": "Developer"})
 
-    with section('count_documents'):
-        with timer():
-            collection.count_documents({'name': 'Alice', "job.title": "Developer"}, comment='count_documents', hint='name_1')
+    collection.count_documents(
+        {"name": "Alice", "job.title": "Developer"},
+        hint="name_1",
+    )
 
-    with section('find 1'):
-        get_list(collection.find({'name': 'Alice'}, comment='find 1'))
+    list(collection.find({"name": "Alice"}))
 
-    with section('find hint'):
-        get_list(collection.find({'name': 'Alice'}, comment='find hint').hint('name_1'))
+    list(collection.find({"name": "Alice"}).hint("name_1"))
 
-    with section('find one'):
-        with timer():
-            collection.find_one({'idx': 25}, comment='find one')
+    collection.find_one({"idx": 25})
 
-    with section('find projection'):
-        get_list(collection.find({'job.title': 'Developer'}, {'job': 1}, comment='find projection'))
+    list(collection.find({"job.title": "Developer"}, {"job": 1}))
 
-    with section('find all'):
-        get_list(collection.find(comment='find all'))
+    list(collection.find())
 
-    with section('find ordered'):
-        get_list(collection.find({'job.title': 'Developer'}, comment='find ordered').sort('age', -1))
+    list(collection.find({"job.title": "Developer"}).sort("age", -1))
 
-    with section('find ordered partly index'):
-        get_list(collection.find({'job.title': 'Developer', 'name': 'Bob'}, comment='find ordered partly index').sort('age', -1))
+    list(
+        collection.find(
+            {"job.title": "Developer", "name": "Bob"},
+        ).sort("age", -1)
+    )
 
-    with section('find ordered in memory'):
-        get_list(collection.find({'job.title': 'Developer'}, comment='find ordered in memory').sort('job.salary', -1))
+    list(collection.find({"job.title": "Developer"}).sort("job.salary", -1))
 
-    with section('find covered by index'):
-        get_list(collection.find({'job.title': 'Developer'}, {'_id': 0, 'job.title': 1, 'age': 1}, comment='find covered by index').sort('age', -1))
+    list(
+        collection.find(
+            {"job.title": "Developer"},
+            {"_id": 0, "job.title": 1, "age": 1},
+        ).sort("age", -1)
+    )
 
-    with section('find skip limit'):
-        get_list(collection.find({'job.title': 'Developer'}, comment='find skip limit').skip(20).limit(50))
+    list(collection.find({"job.title": "Developer"}).skip(20).limit(50))
 
-    with section('find complicated query'):
-        get_list(collection.find({'job.title': 'Developer', 'age': {'$gte': 30, '$lte': 40}}, comment='find complicated query'))
+    list(
+        collection.find(
+            {"job.title": "Developer", "age": {"$gte": 30, "$lte": 40}},
+        )
+    )
 
-    with section('update_many'):
-        with timer():
-            collection.update_many({'name': "Alice"}, {'$set': {'job.salary': 3500}}, comment='update_many')
+    collection.update_many({"name": "Alice"}, {"$set": {"job.salary": 3500}})
 
-    with section('aggregate'):
-        get_list(collection.aggregate([
-             {
-                '$project': {
-                    'food': 0
-                }
-            }, {
-                '$set': {
-                    'money': '$job.salary'
-                }
-            }
-        ], comment='aggregate'))
+    collection.aggregate(
+        [{"$project": {"food": 0}}, {"$set": {"money": "$job.salary"}}],
+    )
 
-    return render(request, 'index.html')
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.execute("SELECT 2")
+        cursor.fetchone()
 
+    return render(request, "index.html")
